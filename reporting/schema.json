@@ -1,0 +1,12 @@
+{
+  "suite": "UN_Algebra_Test_Suite",
+  "version": "1.0.0",
+  "run_id": "",
+  "seed": "",
+  "env": {
+    "python": "",
+    "platform": ""
+  },
+  "invariants": [],
+  "scenarios": []
+}

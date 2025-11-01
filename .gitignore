@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+reporting/REPO_TREE_SHA256.txt
+reporting/SBOM.spdx.json
+.DS_Store

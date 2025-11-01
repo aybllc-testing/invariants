@@ -1,0 +1,165 @@
+suite: UN_Algebra_Test_Suite
+version: 1.0.0
+defaults:
+  trials_per_test: 50000
+  float_type: float64
+  atol: 1e-12
+  rtol: 1e-12
+  seeds:
+    global: 1337
+    properties: 4242
+    metamorphic: 9001
+    scenarios: 7777
+  thresholds:
+    tightness_r_p99_9: 1.001
+    conservativity_gap_min: 0.0
+    M_ratio_max: 1.0
+    zero_fail_upper_bound_per_test: "3/N"
+invariants:
+  - id: INV-01
+    name: Triangle Inequality Constraint
+    spec: "|n_m - n_a| ≤ u_t + u_m"
+    files: [tests/properties/inv01_triangle.py]
+    ops: [id, ⊕, ⊗, scalar×, B, Cα]
+    inputs: [gen_UN, gen_expr_tree]
+    assertions:
+      - kind: inequality
+        left: "abs(n_m - n_a)"
+        right: "u_t + u_m"
+        relation: "<="
+    edge_cases: [boundary_eq, u_t_zero, u_m_zero, all_zero]
+    metrics: [violation_rate]
+  - id: INV-02
+    name: Epistemic Budget (M) Accounting
+    spec: "M = |n_a| + u_t + |n_m| + u_m; M(Cα(x)) = M(x)"
+    files: [tests/properties/inv02_epistemic_budget.py]
+    ops: [id, Cα, ⊗]
+    assertions:
+      - equality: "M(Cα(x)) == M(x)"
+      - nonneg: "M(x) >= 0"
+    metrics: [M_preservation_delta, M_nonneg]
+  - id: INV-03
+    name: Conservativity Under Projection
+    spec: "π(x ○ y).u ≥ (π(x) ○_{N/U} π(y)).u for ○∈{⊕,⊗}"
+    files: [tests/properties/inv03_projection_conservativity.py]
+    ops: [⊕, ⊗]
+    assertions:
+      - kind: inequality
+        left: "proj(op(x,y)).u"
+        right: "classical_op(proj(x), proj(y)).u"
+        relation: ">="
+    metrics: [conservativity_gap_dist]
+  - id: INV-04
+    name: Triangle Preservation Under Addition
+    spec: "Triangle(x) ∧ Triangle(y) ⇒ Triangle(x ⊕ y)"
+    files: [tests/properties/inv04_triangle_addition.py]
+    ops: [⊕]
+    assertions:
+      - holds_for: "sum_nominals_and_uncertainties"
+    edge_cases: [boundary_eq_dual]
+  - id: INV-05
+    name: M-Monotonicity Under Multiplication
+    spec: "M(x ⊗ y) ≤ M(x)·M(y)"
+    files: [tests/properties/inv05_M_monotonicity_mult.py]
+    ops: [⊗]
+    assertions:
+      - kind: inequality
+        left: "M(mul(x,y))"
+        right: "M(x)*M(y)"
+        relation: "<="
+    thresholds:
+      M_ratio_max: 1.0
+    metrics: [M_ratio_dist]
+  - id: INV-06
+    name: Flip Involution
+    spec: "B(B(x)) = x and M(B(x)) = M(x)"
+    files: [tests/properties/inv06_flip_involution.py]
+    ops: [B]
+    assertions:
+      - equality: "B(B(x)) == x"
+      - equality: "M(B(x)) == M(x)"
+  - id: INV-07
+    name: Canonical λ=1 Multiplication (Tightness)
+    spec: "λ=1 product interval-exact (u×u terms included)"
+    files: [tests/properties/inv07_lambda1_mult_tightness.py]
+    ops: [⊗]
+    params: {lam: 1.0}
+    assertions:
+      - conservativity_vs_interval: true
+    metrics:
+      - tightness_ratio_r
+    thresholds:
+      tightness_r_p99_9: 1.001
+  - id: INV-08
+    name: Commutativity (⊕, ⊗)
+    files: [tests/properties/inv08_commutativity.py]
+    ops: [⊕, ⊗]
+    assertions:
+      - epsilon_equal: "op(x,y) == op(y,x)"
+  - id: INV-09
+    name: Associativity (⊕, ⊗)
+    files: [tests/properties/inv09_associativity.py]
+    ops: [⊕, ⊗]
+    assertions:
+      - epsilon_equal: "op(op(x,y),z) == op(x,op(y,z))"
+  - id: INV-10
+    name: Closure (Non-negative Uncertainties Preserved)
+    files: [tests/properties/inv10_closure_nonneg.py]
+    ops: [⊕, ⊗, scalar×, B, Cα]
+    assertions:
+      - nonneg: "u_t >= 0 and u_m >= 0"
+  - id: INV-11
+    name: Projection Reduction Rules
+    spec: "Known n_a: π=(n_m, |n_m-n_a|+u_m); Unknown n_a: π=(n_m, u_t+u_m)"
+    files: [tests/properties/inv11_projection_reduction.py]
+    ops: [π]
+    assertions:
+      - exact_form_known_n_a: true
+      - minimal_conservative_unknown_n_a: true
+  - id: INV-12
+    name: Non-Negativity of Uncertainties (Axiom)
+    files: [tests/properties/inv12_nonneg_axiom.py]
+    ops: [id]
+    assertions:
+      - nonneg_inputs: true
+  - id: INV-13
+    name: Catch Operator: Collapse with Preservation
+    spec: "Cα(x)=((0,0),(n_m, |n_m-n_a|+u_t+u_m)); M preserved"
+    files: [tests/properties/inv13_catch_preserves_M.py]
+    ops: [Cα]
+    assertions:
+      - form_match: true
+      - equality: "M(Cα(x))==M(x)"
+  - id: INV-14
+    name: Sub-Distributivity of ⊗ over ⊕
+    spec: "x ⊗ (y ⊕ z) ⪯ (x ⊗ y) ⊕ (x ⊗ z); nominals equal; u_L ≤ u_R"
+    files: [tests/properties/inv14_subdistributivity.py]
+    ops: [⊕, ⊗]
+    assertions:
+      - epsilon_equal: "nom(x⊗(y⊕z)) == nom((x⊗y)⊕(x⊗z))"
+      - inequality: "u(x⊗(y⊕z)) ≤ u((x⊗y)⊕(x⊗z))"
+  - id: INV-15
+    name: Zero-Failure Validation (Meta)
+    files: [tests/properties/inv15_zero_failure_meta.py]
+    ops: [all]
+    assertions:
+      - aggregate_zero_failures: true
+scenarios:
+  - id: SCN-01
+    name: Decision Thresholding Under Uncertainty
+    metrics: [false_alarm, missed_detection, regret]
+  - id: SCN-02
+    name: Sensor Fusion Stability
+    metrics: [band_width_stability, triangle_violations=0]
+  - id: SCN-03
+    name: Control Chain Propagation
+    metrics: [tightness_r_chain, M_growth_chain, runtime]
+  - id: SCN-04
+    name: Outlier Resilience
+    metrics: [degradation_slope, recovery_time]
+reports:
+  - format: json
+    path: reporting/results.json
+    schema: reporting/schema.json
+  - format: md
+    path: reporting/summary.md

@@ -1,0 +1,112 @@
+name: provenance-and-signing
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # required for keyless signing (OIDC)
+  attestations: write
+
+jobs:
+  build-test-sbom-hash:
+    runs-on: ubuntu-latest
+    outputs:
+      tree_sha256: ${{ steps.hash.outputs.tree_hash }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run tests
+        run: pytest -q tests
+
+      - name: Compute repo tree hash
+        id: hash
+        run: |
+          python scripts/hash_tree.py --out reporting/REPO_TREE_SHA256.txt
+          echo "tree_hash=$(tail -n1 reporting/REPO_TREE_SHA256.txt | awk '{print $2}')" >> $GITHUB_OUTPUT
+
+      - name: Generate SBOM (syft)
+        uses: anchore/sbom-action/download-syft@v0.15.10
+      - name: Create SBOM file
+        run: syft packages dir:. -o spdx-json=reporting/SBOM.spdx.json
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: |
+            reporting/REPO_TREE_SHA256.txt
+            reporting/SBOM.spdx.json
+
+  sign-attest:
+    needs: build-test-sbom-hash
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: reports
+          path: reporting
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3.7.0
+
+      - name: Keyless sign TREE hash
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign sign-blob             --yes             --output-signature reporting/REPO_TREE_SHA256.sig             reporting/REPO_TREE_SHA256.txt
+
+      - name: Verify signature (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cosign verify-blob             --certificate-oidc-issuer https://token.actions.githubusercontent.com             --certificate-identity "https://github.com/${{ github.repository }}/.github/workflows/provenance-and-signing.yml@refs/tags/${{ github.ref_name }}"             --signature reporting/REPO_TREE_SHA256.sig             reporting/REPO_TREE_SHA256.txt
+
+      - name: Attest provenance (SLSA-like)
+        env:
+          COSIGN_EXPERIMENTAL: "1"
+        run: |
+          cat > provenance.json <<'JSON'
+          {
+            "predicateType": "https://slsa.dev/provenance/v1",
+            "predicate": {
+              "buildType": "custom-un-algebra-tests",
+              "materials": [
+                { "uri": "git+https://github.com/${{ github.repository }}@${{ github.sha }}" }
+              ],
+              "metadata": {
+                "invocationID": "${{ github.run_id }}",
+                "buildStartedOn": "${{ github.run_started_at }}"
+              },
+              "buildConfig": {
+                "tree_sha256": "${{ needs.build-test-sbom-hash.outputs.tree_sha256 }}",
+                "python": "3.11"
+              }
+            }
+          }
+          JSON
+          cosign attest             --yes             --predicate provenance.json             --type slsaprovenance             --rekor-url https://rekor.sigstore.dev             reporting/REPO_TREE_SHA256.txt
+
+      - name: Upload signed artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: signed-reports
+          path: |
+            reporting/REPO_TREE_SHA256.txt
+            reporting/REPO_TREE_SHA256.sig
