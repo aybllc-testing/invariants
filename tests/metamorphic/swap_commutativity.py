@@ -1,9 +1,10 @@
 import numpy as np
 from tests.utils.generators import gen_UN
 from tests.utils.algebra_api import add, mul
+from tests.utils.ssot_loader import get_trials, get_seed
 
-SEED = 9001
-TRIALS = 1000
+SEED = get_seed('metamorphic')
+TRIALS = get_trials(override=1000)
 
 def test_commutativity_meta():
     rng = np.random.default_rng(SEED)

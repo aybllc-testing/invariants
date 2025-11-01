@@ -1,9 +1,11 @@
 import numpy as np
 from tests.utils.generators import gen_UN, M
 from tests.utils.algebra_api import mul
+from tests.utils.ssot_loader import get_trials, get_seed, get_atol
 
-SEED = 4242
-TRIALS = 2000
+SEED = get_seed('properties')
+TRIALS = get_trials(override=2000)
+ATOL = get_atol()
 
 def test_inv05_M_monotonicity_mult():
     rng = np.random.default_rng(SEED)
@@ -11,4 +13,4 @@ def test_inv05_M_monotonicity_mult():
         x = gen_UN(rng); y = gen_UN(rng)
         lhs = M(mul(x, y, lam=1.0))
         rhs = M(x) * M(y)
-        assert lhs <= rhs + 1e-12
+        assert lhs <= rhs + ATOL

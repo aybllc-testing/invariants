@@ -123,7 +123,7 @@ invariants:
     assertions:
       - nonneg_inputs: true
   - id: INV-13
-    name: Catch Operator: Collapse with Preservation
+    name: "Catch Operator: Collapse with Preservation"
     spec: "Cα(x)=((0,0),(n_m, |n_m-n_a|+u_t+u_m)); M preserved"
     files: [tests/properties/inv13_catch_preserves_M.py]
     ops: [Cα]
