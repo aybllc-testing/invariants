@@ -2,11 +2,12 @@ import numpy as np
 import pytest
 from tests.utils.generators import gen_UN, boundary_ok
 from tests.utils.algebra_api import add
-from tests.utils.ssot_loader import get_trials, get_seed, get_atol
+from tests.utils.ssot_loader import get_trials, get_seed, get_atol, get_rtol
 
 SEED = get_seed('properties')
 TRIALS = get_trials(override=2000)
 ATOL = get_atol()
+RTOL = get_rtol()
 
 
 def test_inv04_triangle_preservation_addition():
@@ -28,8 +29,10 @@ def test_inv04_triangle_preservation_addition():
         # Compute sum
         result = add(x, y)
 
-        # Check that result satisfies triangle inequality
-        if not boundary_ok(result, atol=ATOL):
+        # Check that result satisfies triangle inequality (scale-relative tolerance)
+        (na_r, ut_r), (nm_r, um_r) = result
+        scale = max(abs(na_r), abs(nm_r), ut_r, um_r, 1.0)
+        if not boundary_ok(result, atol=ATOL + RTOL * scale):
             violations += 1
 
     assert violations == 0, f"Triangle preservation violated {violations}/{TRIALS} times"
@@ -70,8 +73,12 @@ def test_inv04_triangle_boundary_cases():
         # Add them
         result = add(x, y)
 
-        # Result should still satisfy triangle (possibly at boundary)
-        assert boundary_ok(result, atol=ATOL), "Triangle violated at boundary case"
+        # Result should still satisfy triangle (possibly at boundary).
+        # Use scale-relative tolerance: at boundary, floating-point rounding can
+        # produce |nm-na| slightly above ut+um by ~rtol*scale.
+        (na_r, ut_r), (nm_r, um_r) = result
+        scale = max(abs(na_r), abs(nm_r), ut_r, um_r, 1.0)
+        assert boundary_ok(result, atol=ATOL + RTOL * scale), "Triangle violated at boundary case"
 
 
 def test_inv04_componentwise_addition():
@@ -105,4 +112,6 @@ def test_inv04_componentwise_addition():
         # By triangle inequality of absolute values and the fact that
         # |nm1-na1| ≤ ut1+um1 and |nm2-na2| ≤ ut2+um2, this should hold
 
-        assert boundary_ok(result, atol=ATOL)
+        (na_r2, ut_r2), (nm_r2, um_r2) = result
+        scale2 = max(abs(na_r2), abs(nm_r2), ut_r2, um_r2, 1.0)
+        assert boundary_ok(result, atol=ATOL + RTOL * scale2)

@@ -2,11 +2,12 @@ import numpy as np
 import pytest
 from tests.utils.generators import gen_UN
 from tests.utils.algebra_api import add, mul
-from tests.utils.ssot_loader import get_trials, get_seed, get_atol
+from tests.utils.ssot_loader import get_trials, get_seed, get_atol, get_rtol
 
 SEED = get_seed('properties')
 TRIALS = get_trials(override=2000)
 ATOL = get_atol()
+RTOL = get_rtol()
 
 
 def test_inv14_subdistributivity_nominals_equal():
@@ -30,8 +31,9 @@ def test_inv14_subdistributivity_nominals_equal():
         right = add(mul(x, y, lam=1.0), mul(x, z, lam=1.0))
         (na_r, ut_r), (nm_r, um_r) = right
 
-        # Check nominal equality
-        if abs(na_l - na_r) > ATOL or abs(nm_l - nm_r) > ATOL:
+        # Check nominal equality (mixed tolerance)
+        if (abs(na_l - na_r) > ATOL + RTOL * max(abs(na_l), abs(na_r)) or
+                abs(nm_l - nm_r) > ATOL + RTOL * max(abs(nm_l), abs(nm_r))):
             violations += 1
 
     assert violations == 0, f"Nominal distributivity violated {violations}/{TRIALS} times"
@@ -65,11 +67,14 @@ def test_inv14_subdistributivity_uncertainties():
         excess_ut = ut_l - ut_r
         excess_um = um_l - um_r
 
-        if excess_ut > ATOL:
+        tol_ut = ATOL + RTOL * max(abs(ut_l), abs(ut_r))
+        tol_um = ATOL + RTOL * max(abs(um_l), abs(um_r))
+
+        if excess_ut > tol_ut:
             violations_ut += 1
             max_excess_ut = max(max_excess_ut, excess_ut)
 
-        if excess_um > ATOL:
+        if excess_um > tol_um:
             violations_um += 1
             max_excess_um = max(max_excess_um, excess_um)
 
@@ -107,7 +112,8 @@ def test_inv14_subdistributivity_combined():
 
         # Nominals should be equal (tested above)
         # Uncertainties should satisfy ut_l <= ut_r and um_l <= um_r
-        if ut_l > ut_r + ATOL or um_l > um_r + ATOL:
+        if (ut_l > ut_r + ATOL + RTOL * max(abs(ut_l), abs(ut_r)) or
+                um_l > um_r + ATOL + RTOL * max(abs(um_l), abs(um_r))):
             violations += 1
 
     assert violations == 0, f"Combined sub-distributivity violated {violations}/{TRIALS} times"

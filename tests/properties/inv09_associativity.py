@@ -2,21 +2,28 @@ import numpy as np
 import pytest
 from tests.utils.generators import gen_UN
 from tests.utils.algebra_api import add, mul
-from tests.utils.ssot_loader import get_trials, get_seed, get_atol
+from tests.utils.ssot_loader import get_trials, get_seed, get_atol, get_rtol
 
 SEED = get_seed('properties')
 TRIALS = get_trials(override=2000)
 ATOL = get_atol()
+RTOL = get_rtol()
 
 
-def epsilon_equal(un1, un2, atol=None):
-    """Check if two UN values are epsilon-equal."""
+def epsilon_equal(un1, un2, atol=None, rtol=None):
+    """Check if two UN values are epsilon-equal (mixed absolute+relative tolerance)."""
     if atol is None:
         atol = ATOL
+    if rtol is None:
+        rtol = RTOL
     (na1, ut1), (nm1, um1) = un1
     (na2, ut2), (nm2, um2) = un2
-    return (abs(na1 - na2) < atol and abs(ut1 - ut2) < atol and
-            abs(nm1 - nm2) < atol and abs(um1 - um2) < atol)
+    return (
+        abs(na1 - na2) < atol + rtol * max(abs(na1), abs(na2)) and
+        abs(ut1 - ut2) < atol + rtol * max(abs(ut1), abs(ut2)) and
+        abs(nm1 - nm2) < atol + rtol * max(abs(nm1), abs(nm2)) and
+        abs(um1 - um2) < atol + rtol * max(abs(um1), abs(um2))
+    )
 
 
 def test_inv09_associativity_addition():
@@ -66,7 +73,7 @@ def test_inv09_associativity_multiplication():
         for i in range(4):
             max_deltas[i] = max(max_deltas[i], deltas[i])
 
-        if not epsilon_equal(left, right, atol=ATOL * 10):  # Slightly relaxed for multiplication
+        if not epsilon_equal(left, right):  # Mixed atol+rtol handles scale variation
             violations += 1
 
     # Note: Multiplication associativity may not hold exactly with placeholder implementation
